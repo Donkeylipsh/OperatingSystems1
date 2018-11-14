@@ -1,0 +1,714 @@
+###############################################################################################
+# Author: Colin Van Overschelde
+# Date: 4/22/2018
+# Description: matrix is a bash shell script that demonstrates manipulating mathmatical matrices
+#	       through reading data from both stdin and files, parsing the data into a matrix, 
+#	       performing math operations on the matrix, and finally displaying the output as a
+#	       formatted matrix
+##############################################################################################
+
+#!/bin/bash
+
+##############################################################################################
+# Description: dims is a function that accepts a single matrix from stdin or a file, calculates
+#	       the rows and columns of the matrix, and then displays the output to stdout
+# e.g.: 'matrix dims m1'
+# Parameters: $1 is the input matrix
+# Pre-conditions: n/a
+# Post-conditions: Matrix dimensions displayed to stdout in the format 'rows columns'
+#############################################################################################
+dims()
+{
+    #validate parameters
+    # Check if more than one parameter was passed to dims
+    if [ $# -gt 1 ]
+    then
+	# If yes, print error to stderr and exit with status 1
+	echo "Argument count is greater than 1 (e.g. 'matrix dims m1 m2')" >&2
+	exit 1
+    # Check if the file passed in parameter 1 exists
+    elif [ -e $1 ]
+    then
+	# If yes, check if the file is readable
+	if [ -r $1 ]
+        then
+	    # If yes, read rows and columns from the file
+	    input="dimsInputFile"
+	    if [ $# -eq 0 ]
+	    then
+		cat > $input
+	    else
+		cat $1 > $input
+	    fi
+
+	    # Initialize rows and cols values
+	    rows=0
+	    cols=0
+
+	    # Get column count by counting each column in the first line
+	    read < $input myLine
+	    for i in $myLine
+	    do
+		# Increment cols
+	        cols=$(expr $cols + 1)
+	    done
+
+	    # Get row count by reading each line from the file passed as a parameter
+	    while read inputLine
+	    do
+		# Increment rows
+	        rows=$(expr $rows + 1)
+	    done < $input
+
+	    #if [ $# -eq 0 ]
+	    #then
+		# Increment rows
+	#	rows=$(expr $rows + 1)
+	 #   fi
+
+	    # Print dimensions to stdout
+	    echo "$rows $cols" >&1
+
+	    rm -f $input
+
+	    exit 0
+	else
+	    # File is not readable, print error to stderr and exit with status 1
+	    echo "Argument count is 1 but the file named by argument 1 is not readable" >&2
+	    exit 1
+	fi
+    else
+	# File is not not, print error to stderr and exit with status 1
+	echo "Argument count is 1 but file named by argument 1 doesn't exist" >&2
+	exit 1
+    fi
+}
+
+##################################################################################################
+# Description: transpose() accepts a single input matrix and performs mathmatical transpose, to 
+#	       manipulate the matrix, and finally displays the transposed matrix to stdout
+# e.g.: 'matrix transpose m1'
+# Parameters: $1 is the input matrix to transpose
+# Pre-conditions: n/a
+# Post-conditions: the transposed matrix is displayed to stdout
+##################################################################################################
+transpose()
+{
+    # Validate parameters
+    # Check if more than one parameter was passed to transpose
+    if [ $# -gt 1 ]
+    then
+	# If yes, print error to stderr and exit with status 1
+	echo "Argument count is greater than 1 (e.g. matrix transpose m1 m2)" >&2
+	exit 1
+    # Check if the file passed in parameter 1 exists
+    elif [ -e $1 ]
+    then
+	# If yes, check if the file passed in parameter 1 is readable
+	if [ -r $1 ]
+	then
+	    # Transpose the matrix and exit with status 0
+	    #echo "Starting transpose()"
+	    input="transposeInputFile"
+	    if [ $# -eq 0 ]
+	    then
+		cat > "$input"
+	    else
+		cat "$1" > $input
+	    fi
+
+	    #echo "Transposing matrix:"
+	    #cat $input
+
+	    # Get number of columns to transpose
+	    # Read the first line of the file passed as parameter 2
+	    read < "$input" myLine
+	    cols=0
+	    # Count the number of columns in the first line
+	    for i in $myLine
+	    do
+		cols=$(expr $cols + 1)
+	    done
+
+	    #echo "Total columns: $cols"
+
+	    # Create files to hold transposed matrix/rows/columns
+	    tempMatrix="matrixTranspose"
+	    tempRow="tempRowFile"
+	    tempCol="tempColFile"
+	    tempLine="tempLineFile"
+
+	    # Initialize column counter
+	    currentCol=1
+	    cols=$(expr $cols + 1)
+
+
+	    # Loop through each row of the file, col times
+	    while test $currentCol -ne $cols
+	    do
+		#echo "* Loop: $currentCol"
+		# Clear the contents of tempCol and tempRow
+		> $tempCol
+		#> $tempRow
+		#> $tempLine
+
+		# Read each row
+		while read someLine
+		do
+		    # Copy the read line to a file so cut command can be used
+		    echo "$someLine" > "$tempLine"
+
+		    # Read the currentCol column of the row and add it to tempCol
+		    cut -f $currentCol "$tempLine" >> "$tempCol"
+		done < "$input"
+
+		#echo "Column to transpose: "
+		#cat $tempCol
+		
+		# Convert tempCol back into a row
+		cat "$tempCol" | tr '\n' '\t' > "$tempRow"
+
+		read < "$tempRow" someLine
+		#echo "Someline: $someLine"
+		someline=${someLine%?}
+
+		echo "$someLine" > "$tempRow"
+		# Add a new line to the end of $tempRow
+		#echo >> "$tempRow"
+
+		# Add the new row to the matrix
+		cat "$tempRow" >> "$tempMatrix$$"
+
+		# Increment currentCol
+		currentCol=$(expr $currentCol + 1)
+	    done
+
+	    #echo "Transpose Complete, new Matrix:"
+	
+    	    # Display the transposed matrix
+	    cat "$tempMatrix$$" >&1
+
+	    # Remove temporary files
+	    rm -f $tempCol
+	    rm -f $tempRow
+	    rm -f $tempLine
+	    rm -f $tempMatrix$$
+
+	    exit 0
+	else
+	    # File is not readable, print error to stderr and exit with status 1
+	    echo "Argument count is 1, but the file named by argument 1 is not readable" >&2
+	    exit 1
+	fi
+    else
+	# File is not found, print error to stderr and exit with status 1
+	echo "Argument count is 1, but file named by argument 1 doesn't exist" >&2
+	exit 1
+    fi
+}
+
+#########################################################################################################
+# Description: mean() accepts a single matrix as input, calculates the mean value for each matrix column
+#	       and finally displays the single row vector of mean values for each column
+# e.g.: 'matrix mean m1'
+# Parameters: $1 is the matrix to calculate the mean values for
+# Pre-conditions: n/a
+# Post-conditions: A vecotr of mean values for each column is displayed to stdout
+#########################################################################################################
+mean()
+{
+    # Validate parameters
+    # Check if there are more than 1 parameter passed
+    if [ $# -gt 1 ]
+    then
+	# Print error message to stderr and exit with status 1
+	echo "Argument count is greater than 1 (e.g. matrix mean m1 m2)" >&2
+	exit 1
+    # Check if the file passed in as a parameter exists
+    elif [ -e $1 ]
+    then
+	# Check if the file passed in can be read
+	if [ -r $1 ]
+	then
+	    # Parameters valid, calculate mean and exit with status 0
+	    #echo "Starting mean()"
+
+	    input="meanInputFile"
+	    if [ $# -eq 0 ]
+	    then
+		cat > $input
+	    else
+		cat $1 > $input
+	    fi
+
+	    # Calculate number of columns
+	    cols=0
+	    read < $input nextLine
+	    for i in $nextLine
+	    do
+		cols=$(expr $cols + 1)
+	    done
+
+	    # Increment cols for loop
+	    cols=$(expr $cols + 1)
+
+	    currentCol=1
+
+	    colMeans="matrixMean"
+	    tempCol="tempColFile"
+	    tempLine="tempLineFile"
+	    tempRow="tempRowFile"
+
+	    #echo "Starting column loops, total columns: $cols"
+
+	    # Loop through each column reading each value and calculating mean
+	    while [ $currentCol -ne $cols ]
+	    do
+		
+	        # Initialize variables to calculate mean
+	        count=0
+	        total=0
+
+		# Clear the contents of tempCol
+		> $tempCol
+
+		# Loop through each row of the matrix
+		while read nextLine
+		do
+		    # Copy nextLine to tempLine so it can be read with cut
+		    echo "$nextLine" > "$tempLine"
+
+		    # Cut the currentCol character from tempLine
+		    cut -f $currentCol "$tempLine" >> "$tempCol"
+		done < $input
+
+		# Convert column to row to easily calculate mean
+		cat $tempCol | tr '\n' '\t' > $tempRow
+		read < $tempRow nextLine
+		
+		#echo "Averaging column: $nextLine"
+
+		# Loop through each value in the row
+		for i in $nextLine
+		do
+		    # Increment count
+		    count=$(expr $count + 1)
+		    # Add the value of i to total
+		    total=$(expr $total + $i)
+		done
+	        #done < $1
+		#echo "Column $currentCol data:"
+	        #echo "* count = $count"
+	        #echo "* total = $total"
+
+	        mean=$total
+	        rounder=0
+
+	        # Check if total is greater than 0
+	        if [ $total -gt 0 ]
+	        then
+		    # If yes, adjust rounder positively
+		    rounder=$(expr $count / 2)
+	        else
+		    # If not, adjust rounder negatively
+		    rounder=$(expr $(expr $count \* -1) / 2)
+	        fi
+	#	echo "Count = $count"
+	        # Divide mean by count
+	        mean=$(expr $(expr $mean + $rounder) / $count)
+
+	       # echo "* mean = $mean"
+		# Add teh column mean value to the output file
+		echo $mean >> $colMeans$$
+
+		# Increment currentCol
+		currentCol=$(expr $currentCol + 1)
+	    done
+	    cat $colMeans$$ > $tempCol
+	    cat $tempCol | tr '\n' '\t' > $colMeans$$
+
+	    read < "$colMeans$$" meanLine
+	    #meanLine=${meanLine%?}
+	    echo "$meanLine" > $colMeans$$
+
+	    #cat $colMeans$$
+
+	    #echo >> $colMeans$$
+	    # Display the mean values
+	    cat $colMeans$$ >&1
+	   
+	    # Remove temporary files
+	    rm -f $tempCol
+	    rm -f $tempRow
+	    rm -f $tempLine
+	    rm -f $colMeans$$
+
+	    exit 0
+	else
+	    # File is not found, print error message to stderr and exit with status 1
+	    echo "Argument count is 1, but the file named by argument 1 is not readable" >&2
+	    exit 1
+	fi
+    else
+	# File is not found, print error to stderr and exit with status 1
+	echo "Argument count is 1, but the file named by argument 1 doesn't exist" >&2
+	exit 1
+    fi
+}
+
+############################################################################################################
+# Description: add() accepts two input matrices, performs matrix add, and finally displays the resulting
+#	       matrix to stdout
+# e.g.: 'matrix add m1 m2'
+# Parameters: $1 is the first matrix to add
+#	      $2 is the second matrix to add
+# Pre-conditions: Matrices $1 and $2 share the same matrix dimensions
+# Post-conditions: The sum of matrix $1 and $2 is displayed to stdout
+############################################################################################################
+add()
+{
+    # Validate parameters
+    # Check if less than 2 arguments
+    if [ $# -lt 2 ]
+    then
+	# Print error to stderr and exit with status 1
+	echo "Argument count less than 2 (e.g. matrix add m1)" >&2
+	exit 1
+    # Check if more than 2 arguments
+    elif [ $# -gt 2 ]
+    then
+	# Print error to stderr and exit with status 2
+	echo "Argument count greater than 2 (e.g. matrix add m1 m2 m3)" >&2
+	exit 1
+    # Check if $1 exists
+    elif [ -e $1 ]
+    then
+	# If yes, check if $1 is readable
+	if [ -r $1 ]
+	then
+	    # If yes, check if $2 exists
+	    if [ -e $2 ]
+	    then
+		# If yes, check if $2 is readable
+		if [ -r $2 ]
+		then
+		    # If yes, check if m1 and m2 have equal column size
+		    read < $1 m1Row
+		    read < $2 m2Row
+		    
+		    # Get column count of m1
+		    m1ColCount=0
+		    #echo "m1 columns"
+		    for i in $m1Row
+		    do
+			#echo "* i = $i"
+			m1ColCount=$(expr $m1ColCount + 1)
+		    done
+
+		    # Get column count of m2
+		    m2ColCount=0
+		    #echo "m2 columns"
+		    for i in $m2Row
+		    do
+			#echo "* j = $j"
+			m2ColCount=$(expr $m2ColCount + 1)
+		    done
+		    # Compare column values
+		    if [ $m1ColCount -eq $m2ColCount ]
+		    then
+			# Create temporary files
+			tempRow="tempRowFile"
+			tempSum="tempSumFile"
+			tempMatrix="matrixSum"
+
+			# If yes, check if m1 and m2 have equal row size
+			# Get m1 row size
+			m1RowCount=0
+			while read m1Row
+			do
+			    m1RowCount=$(expr $m1RowCount + 1)
+			done < $1 
+			# Get m2 row size
+			m2RowCount=0
+			while read m2Row
+			do
+			    m2RowCount=$(expr $m2RowCount + 1)
+			done < $2
+			# Compare row sizes of m1 and m2
+			if [ $m1RowCount -eq $m2RowCount ]
+			then
+			    # Add the two matrices and exit with status 0
+    			    #echo "Starting add()"
+			    currentRow=1
+			    # Loop through all the rows of m1
+			    while read m1Row
+			    do
+				> $tempSum
+				#echo "Current row: $currentRow"
+				# Get the currentRow'th row of m2
+				m2Row=$(head -$currentRow $2 | tail -1)
+				#echo "m1: $m1Row"
+				#echo "m2: $m2Row"
+
+				#echo "Summing values"
+				# Loop through all the values in m1Row
+				currentCol=1
+				for i in $m1Row
+				do
+				    #echo "m1Val = $i"
+				    # Cut the next value from m2Row
+				    m2val=$(echo "$m2Row" | cut -f $currentCol)
+				    #echo $m2Row
+				    #echo "m2Val = $m2val"
+
+				    # Sum the values
+				    sum=$(expr $i + $m2val)
+
+				    # Append the value to tempSum file
+				    echo $sum >> $tempSum
+				    #echo "Testing tempSum"
+				    #cat $tempSum
+
+				    # Increment currentCol
+				    currentCol=$(expr $currentCol + 1)
+				done
+
+				cat $tempSum | tr '\n' '\t' > "$tempRow"
+
+				read < "$tempRow" nextLine
+				#nextLine=${nextLine%?}
+				echo "$nextLine" > "$tempRow"
+	
+				#echo "Sum:"
+				cat "$tempRow" >> "$tempMatrix$$"
+
+				# Increment currentRow
+				currentRow=$(expr $currentRow + 1)
+			    done < $1		    
+					
+			    #echo "Matrix Sum:"
+			    cat "$tempMatrix$$" >&1
+
+			    # Remove temporary files
+			    rm -f $tempRow
+			    rm -f $tempSum
+			    rm -f $tempMatrix$$
+
+			    exit 0
+			else
+			    # Row size not equal, print error to stderr and exit with status 1
+			    echo "Invalid matrices, row size not equal" >&2
+			    exit 1
+			fi
+		    # Column size not equal, print error to stderr and exit with status 1
+		    else
+			echo "Invalid matrices, column size not equal" >&2
+			exit 1
+		    fi
+		# File specified by $2 is not readable
+		else
+		    # Print error to stderr and exit with status 1
+		    echo "Unable to read from $2" >&2
+		    exit 1
+		fi
+	    # File specified by $2 doesn't exist
+	    else
+		# Print error to stderr and exit with status 1
+		echo "File doesn't exist: $2" >&2
+		exit 1
+	    fi
+	# File specified by $1 is not readable
+	else
+	    # Print error to stderr and exit with status 1
+	    echo "Unable to read from: $1" >&2
+	    exit 1
+	fi
+    # File specified by $1 doesn't exist
+    else
+	# Print error to stderr and exit with status 1
+	echo "File doesn't exist: $1" >&2
+	exit 1
+    fi
+}
+
+###############################################################################################
+# Description: multiply() accepts 2 input matrices from file, performs matrix multiply, and
+#	       displays the resulting matrix to stdout
+# e.g.: matrix multiply m1 m2
+# Parameters: $1 is a file containing input matrix 1
+#	      $2 is a file containing input matrix 2
+# Pre-conditions: The column count of matrix $1 = the row count of matrix $2
+# Post-conditions: The resulting matrix is displayed to stdout
+##############################################################################################
+multiply()
+{
+    # Validate parameters
+    # Check if less than 2 arguments
+    if [ $# -lt 2 ]
+    then
+	# If yes, print error to stderr and exit with status 1
+	echo "Argument count less than 2 (e.g. matrix multiply m1)" >&2
+	exit 1
+    # Check if greater than 2 arguments
+    elif [ $# -gt 2 ]
+    then
+	# If yes, print error to stderr and exit with status 1
+	echo "Argument count more than 2 (e.g. matrix multiple m1 m2 m3)" >&2
+	exit 1
+    # Check if filename passed as argument 1 exists
+    elif [ -e $1 ]
+    then
+	# If yes, check if filename passed as argument 1 is readable
+	if [ -r $1 ]
+	then
+	    # If yes, check if filename passed as argument 2 exists
+	    if [ -e $2 ]
+	    then
+		# If yes, check if filename passed as argument 2 is readable
+		if [ -r $2 ]
+		then
+		    # If yes, check if the m1cols = m2rows
+		    # Get column count of m1
+		    m1cols=0
+		    read < $1 m1row
+		    for i in $m1row
+		    do
+			# Increment m1cols
+			m1cols=$(expr $m1cols + 1)
+		    done
+
+		    m2rows=0
+		    while read m2row
+		    do
+			# Increment m2rows
+			m2rows=$(expr $m2rows + 1)
+		    done < $2
+
+		    # Compare m1cols and m2rows
+		    if [ $m1cols -eq $m2rows ]
+		    then
+			# If yes, multiply the matrices
+			# Calculate the product of m1 and m2
+			#echo "Starting multiply()"
+			# Get column count of m2
+			m2cols=0
+			read < $2 m2row
+			for i in $m2row
+			do
+			    # Increment m2cols
+			    m2cols=$(expr $m2cols + 1)
+		        done
+		        #echo "m2cols = $m2cols"
+
+			# Create temp files
+			tempCol="tempColFile"
+			tempRow="tempRowFile"
+			tempMatrix="matrixMultiply"
+			tempProducts="tempProductsFile"
+
+			# Increment m2cols to handle loops
+			m2cols=$(expr $m2cols + 1)
+			currentm1row=1
+			# loop through each row of m1
+			while read m1row
+			do
+			    #echo "Multiplying m1 row: $currentm1row"
+			    # Loop through each column of m2
+			    currentm2col=1
+			    while [ $currentm2col -lt $m2cols ]
+			    do
+				#echo "By m2 column: $currentm2col"
+				# Reset the tempCol and tempRow files
+				> $tempCol
+				# Convert column to row for easy multiplication
+				while read m2row
+				do
+				    # Cut the currentm2col value from the row
+				    m2val=$(echo "$m2row" | cut -f $currentm2col)
+				    echo "$m2val" >> "$tempCol"
+				done < $2
+
+				cat "$tempCol" | tr '\n' '\t' > "$tempRow"
+				echo >> "$tempRow"
+				
+				#echo "Column converted to row:"
+				#cat $tempRow
+
+				index=1
+				productSum=0
+				# Multiply each value in m1row by its matching index in m2col
+				for i in $m1row
+				do
+				    m2val=$(cut -f $index "$tempRow")
+				    #echo "$i * $m2val"
+				    product=$(expr $i \* $m2val)
+				    #echo " = $product"
+
+				    productSum=$(expr $productSum + $product)
+				    #echo "Product Sum = $productSum"
+				    # Increment index
+				    index=$(expr $index + 1)
+				done
+
+				# Append productSum to tempProducts
+				echo "$productSum" >> "$tempProducts"
+				
+				# Increment currentm2col
+				currentm2col=$(expr $currentm2col + 1)
+			    done
+			    cat "$tempProducts" | tr '\n' '\t' > $tempRow
+			    read < "$tempRow" newLine
+
+			    echo "$newLine" > "$tempRow"
+			    #echo "Row of products:"
+			    #cat $tempRow
+
+			    cat "$tempRow" >> $tempMatrix$$
+
+			    # Reset tempProducts
+			    > $tempProducts
+
+			    # Increment currentm1row
+			    currentm1row=$(expr $currentm1row + 1)
+			done < $1
+			    cat $tempMatrix$$
+
+			    rm -f "$tempMatrix$$"
+			    rm -f "$tempRow"
+			    rm -f "$tempCol"
+			    rm -f "$tempProducts"
+
+			exit 0
+		    # Matrix dimensions can't be multiplied
+		    else
+			# Print error to stderr and exit with status 1
+			echo -e "Dimensions of matrices do not allow them to be multipled together following the rules of matrix multiplication" >&2
+			exit 1
+		    fi
+		# Filename passed as argument 2 is not readable
+		else
+		    # Print error to stderr and exit with status 1
+		    echo "Unable to read file: $2" >&2
+		    exit 1
+		fi
+	    # Filename passed as argument 2 doesn't exist
+	    else
+		# Print error to stderr and exit with status 1
+		echo "File not found: $2" >&2
+		exit 1
+	    fi
+	# Filename passed as argument 1 is not readable
+	else
+	    # Print error to stderr and exit with status 1
+	    echo "Unable to read file: $1" >&2
+	    exit 1
+	fi
+    # Filename passed as argument 1 doesn't exist
+    else
+	# Print error to stderr and exit with status 1
+	echo "File not found: $1" >&2
+	exit 1
+    fi
+}
+
+$1 "${@:2}"
