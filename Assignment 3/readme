@@ -1,0 +1,11 @@
+Colin Van Overschelde
+CS 344 -Program 3 - smalls
+5/28/2018
+
+1.To compile smallsh, navigate to the folder containing:
+ * smallsh.c
+ * dynArray.c
+ * dynArray.h
+2. Enter the following command in the command line:
+ * gcc -lreadline -o smallsh smallsh.c dynArray.c
+3. To run the program, enter the following command: smallsh
